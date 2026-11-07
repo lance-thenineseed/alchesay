@@ -19,6 +19,9 @@ repositories {
     mavenCentral()
 }
 
+// Override Boot's managed Jackson 3 for CVE-2026-110879; remove once Boot manages >= 3.1.8
+ext['jackson-bom.version'] = '3.1.8'
+
 // Spring Boot's managed versions, also for library modules that don't apply the Boot plugin
 dependencyManagement {
     imports {
