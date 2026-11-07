@@ -2,6 +2,8 @@ package com.nineseed.alchesay.tracker.event;
 
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
@@ -191,5 +193,162 @@ class CapturedValueTest {
         assertThat(capturedValue.compare(LESS_THAN, "Aardvark")).isFalse();
         assertThat(capturedValue.compare(LESS_THAN, "zebra")).isTrue();
         assertThat(capturedValue.compare(LESS_THAN_OR_EQUAL, "limestone")).isTrue();
+    }
+
+    @Test
+    void testMissingValueComparisons() {
+        CapturedValue missing = new CapturedValue("status", CapturedValue.MISSING_VALUE);
+
+        // A rule can test for an absent field by comparing against the sentinel
+        assertThat(missing.compare(EQUALS, CapturedValue.MISSING_VALUE)).isTrue();
+        assertThat(missing.compare(EQUALS, CapturedValue.NULL_VALUE)).isFalse();
+        assertThat(missing.compare(EQUALS, "SHIPPED")).isFalse();
+        assertThat(missing.compare(EQUALS, "")).isFalse();
+
+        assertThat(missing.compare(NOT_EQUALS, "SHIPPED")).isTrue();
+        assertThat(missing.compare(NOT_EQUALS_IGNORE_CASE, "SHIPPED")).isTrue();
+        assertThat(missing.compare(NOT_EQUALS, CapturedValue.MISSING_VALUE)).isFalse();
+
+        assertThat(missing.compare(GREATER_THAN, 0)).isFalse();
+        assertThat(missing.compare(GREATER_THAN_OR_EQUAL, 0)).isFalse();
+        assertThat(missing.compare(LESS_THAN, 0)).isFalse();
+        assertThat(missing.compare(LESS_THAN_OR_EQUAL, 0)).isFalse();
+        assertThat(missing.compare(LESS_THAN, "zzz")).isFalse();
+
+        assertThat(missing.compare(CONTAINS, "")).isFalse();
+        assertThat(missing.compare(STARTS_WITH, "")).isFalse();
+        assertThat(missing.compare(ENDS_WITH, "")).isFalse();
+    }
+
+    @Test
+    void testNullValueComparisons() {
+        CapturedValue nullValue = new CapturedValue("status", CapturedValue.NULL_VALUE);
+
+        // A rule can test for an explicit JSON null by comparing against the sentinel
+        assertThat(nullValue.compare(EQUALS, CapturedValue.NULL_VALUE)).isTrue();
+        assertThat(nullValue.compare(EQUALS, CapturedValue.MISSING_VALUE)).isFalse();
+        assertThat(nullValue.compare(EQUALS, "null")).isFalse();
+        assertThat(nullValue.compare(EQUALS, 0)).isFalse();
+
+        assertThat(nullValue.compare(NOT_EQUALS, "SHIPPED")).isTrue();
+        assertThat(nullValue.compare(NOT_EQUALS, CapturedValue.NULL_VALUE)).isFalse();
+
+        assertThat(nullValue.compare(GREATER_THAN, 0)).isFalse();
+        assertThat(nullValue.compare(LESS_THAN, 0)).isFalse();
+        assertThat(nullValue.compare(CONTAINS, "")).isFalse();
+        assertThat(nullValue.compare(STARTS_WITH, "")).isFalse();
+    }
+
+    @Test
+    void testOtherCapturedNumberTypes() {
+        // readTree produces Long and BigInteger for large integers
+        CapturedValue longValue = new CapturedValue("long", 3_000_000_000L);
+        assertThat(longValue.compare(EQUALS, "3000000000")).isTrue();
+        assertThat(longValue.compare(EQUALS, 3_000_000_000.0)).isTrue();
+        assertThat(longValue.compare(GREATER_THAN, Integer.MAX_VALUE)).isTrue();
+
+        CapturedValue bigInteger = new CapturedValue("bigInt", new BigInteger("12345678901234567890"));
+        assertThat(bigInteger.compare(GREATER_THAN, Long.MAX_VALUE)).isTrue();
+        assertThat(bigInteger.compare(EQUALS, "12345678901234567890")).isTrue();
+        assertThat(bigInteger.compare(EQUALS, "12345678901234567891")).isFalse();
+
+        CapturedValue bigDecimal = new CapturedValue("bigDecimal", new BigDecimal("42.10"));
+        assertThat(bigDecimal.compare(EQUALS, 42.1)).isTrue();
+        assertThat(bigDecimal.compare(EQUALS, "42.1000")).isTrue();
+    }
+
+    @Test
+    void testFloatingPointPrecision() {
+        // Floats and doubles are compared by their decimal string form, so 0.1f equals 0.1
+        // even though their binary representations differ
+        CapturedValue floatValue = new CapturedValue("float", 0.1f);
+        assertThat(floatValue.compare(EQUALS, 0.1)).isTrue();
+        assertThat(floatValue.compare(EQUALS, "0.1")).isTrue();
+        assertThat(floatValue.compare(GREATER_THAN, 0.1)).isFalse();
+
+        // 0.1 + 0.2 is 0.30000000000000004 as a double, so it is not equal to 0.3
+        CapturedValue sum = new CapturedValue("sum", 0.1 + 0.2);
+        assertThat(sum.compare(EQUALS, 0.3)).isFalse();
+        assertThat(sum.compare(GREATER_THAN, 0.3)).isTrue();
+    }
+
+    @Test
+    void testNegativesAndZero() {
+        CapturedValue negative = new CapturedValue("negative", -1);
+        assertThat(negative.compare(LESS_THAN, 0)).isTrue();
+        assertThat(negative.compare(GREATER_THAN, -2)).isTrue();
+        assertThat(negative.compare(EQUALS, "-1")).isTrue();
+        assertThat(negative.compare(EQUALS, "-1.0")).isTrue();
+        assertThat(negative.compare(EQUALS, 1)).isFalse();
+
+        CapturedValue negativeZero = new CapturedValue("negativeZero", -0.0);
+        assertThat(negativeZero.compare(EQUALS, 0)).isTrue();
+        assertThat(negativeZero.compare(EQUALS, 0.0)).isTrue();
+        assertThat(negativeZero.compare(LESS_THAN, 0)).isFalse();
+    }
+
+    @Test
+    void testInfinityAndNaN() {
+        // Not valid in standard JSON, but possible from Java callers or lenient parsers.
+        CapturedValue infinity = new CapturedValue("infinity", Double.POSITIVE_INFINITY);
+        assertThat(infinity.compare(GREATER_THAN, 5)).isTrue();
+        assertThat(infinity.compare(LESS_THAN, 5)).isFalse();
+        assertThat(infinity.compare(EQUALS, Double.POSITIVE_INFINITY)).isTrue();
+
+        CapturedValue negativeInfinity = new CapturedValue("negativeInfinity", Double.NEGATIVE_INFINITY);
+        assertThat(negativeInfinity.compare(LESS_THAN, -5)).isTrue();
+        assertThat(negativeInfinity.compare(LESS_THAN, "-5")).isTrue();
+        assertThat(negativeInfinity.compare(LESS_THAN, -Double.MAX_VALUE)).isTrue();
+        assertThat(negativeInfinity.compare(LESS_THAN, Double.POSITIVE_INFINITY)).isTrue();
+        assertThat(negativeInfinity.compare(GREATER_THAN, -5)).isFalse();
+        assertThat(negativeInfinity.compare(EQUALS, Double.NEGATIVE_INFINITY)).isTrue();
+        assertThat(negativeInfinity.compare(EQUALS, Float.NEGATIVE_INFINITY)).isTrue();
+        assertThat(negativeInfinity.compare(EQUALS, Double.POSITIVE_INFINITY)).isFalse();
+        assertThat(negativeInfinity.compare(LESS_THAN_OR_EQUAL, Double.NEGATIVE_INFINITY)).isTrue();
+        assertThat(negativeInfinity.compare(LESS_THAN, Double.NEGATIVE_INFINITY)).isFalse();
+
+        // Finite captured values against negative infinity
+        CapturedValue five = new CapturedValue("five", 5);
+        assertThat(five.compare(GREATER_THAN, Double.NEGATIVE_INFINITY)).isTrue();
+        assertThat(five.compare(LESS_THAN, Double.NEGATIVE_INFINITY)).isFalse();
+        assertThat(new CapturedValue("five", "5").compare(GREATER_THAN, Double.NEGATIVE_INFINITY)).isTrue();
+
+        // NaN falls back to Double.equals, which treats NaN as equal to itself
+        CapturedValue nan = new CapturedValue("nan", Double.NaN);
+        assertThat(nan.compare(EQUALS, Double.NaN)).isTrue();
+        assertThat(nan.compare(EQUALS, 0)).isFalse();
+        assertThat(nan.compare(GREATER_THAN, 0)).isFalse();
+        assertThat(nan.compare(LESS_THAN, 0)).isFalse();
+    }
+
+    @Test
+    void testNumericStringOnCapturedSide() {
+        CapturedValue numericString = new CapturedValue("count", "42");
+        assertThat(numericString.compare(EQUALS, 42)).isTrue();
+        assertThat(numericString.compare(EQUALS, 42.0)).isTrue();
+        assertThat(numericString.compare(GREATER_THAN, 40)).isTrue();
+        assertThat(numericString.compare(LESS_THAN, 40)).isFalse();
+
+        // Two strings are never compared as numbers
+        assertThat(numericString.compare(EQUALS, "42.0")).isFalse();
+        assertThat(numericString.compare(EQUALS, "42")).isTrue();
+    }
+
+    @Test
+    void testNumericStringParsing() {
+        CapturedValue fortyTwo = new CapturedValue("count", 42);
+        assertThat(fortyTwo.compare(EQUALS, " 42 ")).isTrue();
+        assertThat(fortyTwo.compare(EQUALS, "4.2e1")).isTrue();
+        assertThat(fortyTwo.compare(EQUALS, "+42")).isTrue();
+
+        // Not parsed as numbers
+        assertThat(fortyTwo.compare(EQUALS, "0x2A")).isFalse();
+        assertThat(fortyTwo.compare(EQUALS, "42abc")).isFalse();
+        assertThat(fortyTwo.compare(EQUALS, "42,0")).isFalse();
+        assertThat(fortyTwo.compare(EQUALS, "")).isFalse();
+
+        CapturedValue thousand = new CapturedValue("count", 1000);
+        assertThat(thousand.compare(EQUALS, "1e3")).isTrue();
+        assertThat(thousand.compare(EQUALS, "1,000")).isFalse();
     }
 }

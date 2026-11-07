@@ -156,17 +156,40 @@ public record CapturedValue(String name, Object value) {
 
     /**
      * Compares two values numerically when at least one is a {@link Number} and both can be converted
-     * to a {@link BigDecimal}.
+     * to a {@link BigDecimal}. Positive and negative infinity, which {@link BigDecimal} cannot represent,
+     * order above and below every finite number.
      *
-     * @return the {@link BigDecimal#compareTo} result, or {@code null} if the values are not comparable as numbers
+     * @return the comparison result, or {@code null} if the values are not comparable as numbers
      */
     private static Integer compareNumbers(Object left, Object right) {
         if (!(left instanceof Number) && !(right instanceof Number)) {
             return null;
         }
+        if (isInfinite(left) || isInfinite(right)) {
+            Double leftDouble = toDouble(left);
+            Double rightDouble = toDouble(right);
+            return leftDouble != null && rightDouble != null ? Double.compare(leftDouble, rightDouble) : null;
+        }
         BigDecimal leftNumber = toBigDecimal(left);
         BigDecimal rightNumber = toBigDecimal(right);
         return leftNumber != null && rightNumber != null ? leftNumber.compareTo(rightNumber) : null;
+    }
+
+    private static boolean isInfinite(Object value) {
+        return (value instanceof Double d && d.isInfinite()) || (value instanceof Float f && f.isInfinite());
+    }
+
+    /**
+     * Converts a value to a {@code double} for comparison against infinity.
+     *
+     * @return the converted value, or {@code null} if {@code value} is not numeric or is NaN
+     */
+    private static Double toDouble(Object value) {
+        if (isInfinite(value)) {
+            return ((Number) value).doubleValue();
+        }
+        BigDecimal number = toBigDecimal(value);
+        return number != null ? number.doubleValue() : null;
     }
 
     private static boolean startsWith(Object left, Object right, boolean ignoreCase) {
