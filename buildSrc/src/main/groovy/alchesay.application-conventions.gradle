@@ -1,0 +1,10 @@
+// A module that produces an executable Spring Boot jar.
+plugins {
+    id 'alchesay.java-conventions'
+    id 'org.springframework.boot'
+}
+
+// Only build the executable (bootJar), not the extra "-plain" jar
+tasks.named('jar') {
+    enabled = false
+}

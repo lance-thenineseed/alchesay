@@ -1,0 +1,5 @@
+// Aggregator only: the root applies no Java plugin and produces no jar.
+// Each module picks a convention plugin from buildSrc:
+//   id 'alchesay.library-conventions'      -> plain library jar
+//   id 'alchesay.application-conventions'  -> executable Spring Boot jar
+description = 'Alchesay workflow tracking system'

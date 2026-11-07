@@ -1,0 +1,5 @@
+// A module that produces a plain library jar for other modules to depend on.
+plugins {
+    id 'alchesay.java-conventions'
+    id 'java-library'
+}
