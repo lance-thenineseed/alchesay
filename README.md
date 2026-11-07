@@ -1,5 +1,7 @@
 # Alchesay
 
+[![Build](https://github.com/lance-thenineseed/alchesay/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/lance-thenineseed/alchesay/actions/workflows/build.yml)
+
 Alchesay is a workflow tracking system. It is in early development.
 
 ## Modules
