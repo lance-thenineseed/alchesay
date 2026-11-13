@@ -7,7 +7,7 @@ import java.math.BigInteger;
 import java.util.List;
 import java.util.Map;
 
-import static com.nineseed.alchesay.tracker.event.CapturedValue.Comparison.*;
+import static com.nineseed.alchesay.tracker.event.ValueComparison.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Fail.fail;

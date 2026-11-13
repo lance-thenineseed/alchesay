@@ -47,42 +47,6 @@ public record CapturedValue(String name, Object value) {
     };
 
     /**
-     * The comparisons supported by {@link #compare(Comparison, Object)}, with the captured value on the
-     * left-hand side. See {@link #compare(Comparison, Object)} for how each applies to numbers, strings
-     * and collections.
-     */
-    public enum Comparison {
-        /** Captured value is greater than the given value, numerically or case-insensitively for strings. */
-        GREATER_THAN,
-        /** Captured value is greater than or equal to the given value, numerically or case-insensitively for strings. */
-        GREATER_THAN_OR_EQUAL,
-        /** Captured value is less than the given value, numerically or case-insensitively for strings. */
-        LESS_THAN,
-        /** Captured value is less than or equal to the given value, numerically or case-insensitively for strings. */
-        LESS_THAN_OR_EQUAL,
-        /** Captured value equals the given value; numbers are compared by value regardless of type. */
-        EQUALS,
-        /** Like {@link #EQUALS}, but strings are compared ignoring case. */
-        EQUALS_IGNORE_CASE,
-        /** Negation of {@link #EQUALS}. */
-        NOT_EQUALS,
-        /** Negation of {@link #EQUALS_IGNORE_CASE}. */
-        NOT_EQUALS_IGNORE_CASE,
-        /** Captured string contains the given string, or captured collection contains an element {@link #EQUALS} to it. */
-        CONTAINS,
-        /** Like {@link #CONTAINS}, but strings and collection elements are compared ignoring case. */
-        CONTAINS_IGNORE_CASE,
-        /** Captured string starts with the given string. */
-        STARTS_WITH,
-        /** Like {@link #STARTS_WITH}, but ignoring case. */
-        STARTS_WITH_IGNORE_CASE,
-        /** Captured string ends with the given string. */
-        ENDS_WITH,
-        /** Like {@link #ENDS_WITH}, but ignoring case. */
-        ENDS_WITH_IGNORE_CASE,
-    }
-
-    /**
      * Creates a captured value.
      *
      * @param name  the name identifying this value
@@ -100,8 +64,8 @@ public record CapturedValue(String name, Object value) {
      * When either side is a {@link Number}, both sides are compared by numeric value regardless of type,
      * and a numeric {@link String} on the other side is parsed as a number. For example, {@code 42} equals
      * {@code 42L}, {@code 42.0}, {@code "42"} and {@code "42.0"}. Otherwise values are compared with
-     * {@link Object#equals}. {@link Comparison#EQUALS_IGNORE_CASE} ignores case when both sides are strings
-     * and otherwise behaves like {@link Comparison#EQUALS}.
+     * {@link Object#equals}. {@link ValueComparison#EQUALS_IGNORE_CASE} ignores case when both sides are strings
+     * and otherwise behaves like {@link ValueComparison#EQUALS}.
      * <p>
      * {@code STARTS_WITH}, {@code ENDS_WITH} and {@code CONTAINS} (and their ignore-case variants) apply only
      * when both sides are strings; for any other types they return {@code false}. As with {@link String#contains},
@@ -127,7 +91,7 @@ public record CapturedValue(String name, Object value) {
      * @throws IllegalArgumentException for {@code CONTAINS} or {@code CONTAINS_IGNORE_CASE} when
      *                                  {@code value} is a {@link Map}
      */
-    public boolean compare(@NonNull Comparison comparison, Object value) {
+    public boolean compare(@NonNull ValueComparison comparison, Object value) {
         return switch (comparison) {
             case EQUALS -> isEqual(this.value, value);
             case EQUALS_IGNORE_CASE -> isEqualIgnoreCase(this.value, value);

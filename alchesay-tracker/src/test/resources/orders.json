@@ -1,0 +1,48 @@
+{
+  "order1": {
+    "headers": {
+      "version": 2,
+      "timestamp": "2026-11-05T15:19:03"
+    },
+    "payload": {
+      "event": "order_created",
+      "status": "new",
+      "order_id": "23456789"
+    }
+  },
+  "order2": {
+    "headers": {
+      "version": 2,
+      "timestamp": "2026-11-05T15:21:08"
+    },
+    "payload": {
+      "event": "order_status_changed",
+      "status": "in-progress",
+      "order_id": "23456789"
+    }
+  },
+  "order3": {
+    "headers": {
+      "version": 2,
+      "timestamp": "2026-11-05T15:25:15"
+    },
+    "payload": {
+      "event": "order_status_changed",
+      "status": "complete",
+      "order_id": "23456789"
+    }
+  },
+  "inventory1": {
+    "headers": {
+      "version": 2,
+      "timestamp": "2026-11-05T15:20:49"
+    },
+    "payload": {
+      "event": "inventory_confirmed",
+      "status": "in-stock",
+      "order_id": "ORD-23456789",
+      "sku": "890981274750291039848",
+      "notes": "there are \\${count}\\ units remaining"
+    }
+  }
+}
