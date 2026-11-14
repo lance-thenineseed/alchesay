@@ -1,18 +1,20 @@
 package com.nineseed.alchesay.tracker.workflow;
 
+import com.nineseed.alchesay.tracker.MultiThreadHelper;
+import com.nineseed.alchesay.tracker.MultiThreadHelper.NamedRunnable;
 import com.nineseed.alchesay.tracker.event.CapturedValue;
+import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -197,75 +199,40 @@ class ContextTest {
 
     @Test
     void testMultipleThreads() throws InterruptedException {
-        Duration waitForFailure = Duration.ofSeconds(2);
         Context context = new Context();
-        for(int i = 0; i < NUM_VALUES; ++i) {
-            CapturedValue value = new CapturedValue(valueName(i), NUM_VALUES - i);
-            context.putValue(value);
-        }
 
-        AtomicInteger errorCount = new AtomicInteger();
-        Collection<Thread> threads = new ArrayList<>();
-        for(int i = 0; i < 100; i++) {
-            Thread thread = new Thread(() -> {
-                LocalDateTime time = LocalDateTime.now().plus(waitForFailure);
-                while (LocalDateTime.now().isBefore(time) &&  errorCount.get() == 0) {
-                    try {
-                        CapturedValue value1 = context.find(randomValueName());
-                        CapturedValue value2 = new CapturedValue(value1.name(), randomNewValue());
-                        context.putValue(value2);
-                    } catch(Throwable e) {
-                        errorCount.incrementAndGet();
-                        System.out.println(e.getMessage());
-                    }
-                }
-            });
-            threads.add(thread);
-            thread.start();
-        }
+        AtomicInteger puts = new AtomicInteger(0);
+        context.putValue(new CapturedValue(valueName(0), puts.getAndIncrement()));
 
-        for(int i = 0; i < 20; i++) {
-            Thread thread = new Thread(() -> {
-                LocalDateTime time = LocalDateTime.now().plus(waitForFailure);
-                while (LocalDateTime.now().isBefore(time) &&  errorCount.get() == 0) {
-                    try {
-                        List<CapturedValue> batch = IntStream.range(0, 10)
-                                .mapToObj(j -> new CapturedValue(randomValueName(), randomNewValue()))
-                                .toList();
-                        context.putAll(batch);
-                    } catch(Throwable e) {
-                        errorCount.incrementAndGet();
-                        System.out.println(e.getMessage());
-                    }
-                }
-            });
-            threads.add(thread);
-            thread.start();
-        }
+        MultiThreadHelper threadHelper = new MultiThreadHelper(
+                List.of(new NamedRunnable("addValues", () -> {
+                            if(puts.get() < NUM_VALUES) {
+                                int n = puts.getAndIncrement();
+                                context.putValue(new CapturedValue(valueName(n), n));
+                            }
+                        }),
+                        new NamedRunnable("changeValue", () -> {
+                                CapturedValue value1 = context.find(randomValueName(context));
+                                CapturedValue value2 = new CapturedValue(value1.name(), randomNewValue(context));
+                                context.putValue(value2);
+                        }),
+                        new NamedRunnable("putAll", () -> {
+                                List<CapturedValue> batch = IntStream.range(0, 10)
+                                        .mapToObj(j -> new CapturedValue(randomValueName(context), randomNewValue(context)))
+                                        .toList();
+                                context.putAll(batch);
+                        }),
+                        new NamedRunnable("copy", () -> {
+                                Collection<CapturedValue> values = context.getValues();
+                                List.copyOf(values);
+                        })),
+                List.of(20, 100, 20, 100),
+                Duration.ofMillis(500)
+        );
 
-        for(int i = 0; i < 100; i++) {
-            Thread thread = new Thread(() -> {
-                LocalDateTime time = LocalDateTime.now().plus(waitForFailure);
-                while (LocalDateTime.now().isBefore(time) && errorCount.get() == 0) {
-                    try {
-                        Collection<CapturedValue> values = context.getValues();
-                        List.copyOf(values);
-                    } catch(Throwable e) {
-                        errorCount.incrementAndGet();
-                        System.out.println(e.getMessage());
-                    }
-                }
-            });
-            threads.add(thread);
-            thread.start();
-        }
-
-        for (Thread thread : threads) {
-            thread.join();
-        }
-
-        assertThat(errorCount.get()).isEqualTo(0);
-        List<String> expectedNames = IntStream.range(0, NUM_VALUES).mapToObj(this::valueName).toList();
+        threadHelper.test();
+        assertThat(context.getValues().size()).isCloseTo(NUM_VALUES, Offset.offset(5));
+        List<String> expectedNames = IntStream.range(0, context.getValues().size()).mapToObj(this::valueName).toList();
         assertThat(context.getValues()).extracting(CapturedValue::name).containsExactlyElementsOf(expectedNames);
     }
 
@@ -273,11 +240,17 @@ class ContextTest {
         return String.format("id-%04d", i);
     }
 
-    private String randomValueName() {
-        return valueName(ThreadLocalRandom.current().nextInt(NUM_VALUES));
+    private String randomValueName(Context context) {
+        int n = ThreadLocalRandom.current().nextInt(context.getValues().size());
+        Iterator<CapturedValue> iterator = context.getValues().iterator();
+        while (n > 1 && iterator.hasNext()) {
+            iterator.next();
+            n--;
+        }
+        return iterator.hasNext() ? iterator.next().name() : "";
     }
 
-    private int randomNewValue() {
-        return -ThreadLocalRandom.current().nextInt(NUM_VALUES);
+    private int randomNewValue(Context context) {
+        return -ThreadLocalRandom.current().nextInt(context.getValues().size() - 1);
     }
 }

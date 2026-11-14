@@ -1,5 +1,7 @@
 package com.nineseed.alchesay.tracker.rules;
 
+import com.nineseed.alchesay.tracker.MultiThreadHelper;
+import com.nineseed.alchesay.tracker.MultiThreadHelper.NamedRunnable;
 import com.nineseed.alchesay.tracker.event.ValueComparison;
 import com.nineseed.alchesay.tracker.event.ValueReference;
 import com.nineseed.alchesay.tracker.workflow.Context;
@@ -11,6 +13,7 @@ import tools.jackson.databind.node.MissingNode;
 
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.time.Duration;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -126,5 +129,36 @@ class RuleTests {
         assertThat(inventoryRule.test(order2, context)).isFalse();
         assertThat(inventoryRule.test(order3, context)).isFalse();
         assertThat(inventoryRule.test(inventory1, context)).isTrue();
+    }
+
+    @Test
+    void testMultipleThreads() throws InterruptedException {
+        ValueReference notesRef = new ValueReference("notes", "/payload/notes");
+        Rule inventoryRule = new LogicalRule(List.of(
+                new MatchingRule(eventRef, ValueComparison.EQUALS, "inventory_confirmed"),
+                new MatchingRule(orderIdRef, ValueComparison.EQUALS, "ORD-${orderId}")
+        ), LogicalOperator.AND);
+
+        Rule inProgressRule = new LogicalRule(List.of(
+                new MatchingRule(statusRef, ValueComparison.EQUALS, "in-progress"),
+                // pulls the orderId from the context
+                new MatchingRule(orderIdRef, ValueComparison.EQUALS, "${orderId}")
+        ), LogicalOperator.AND);
+
+        MultiThreadHelper helper = new MultiThreadHelper(List.of(
+                new NamedRunnable("test inventory rule", () -> {
+                    assertThat(inventoryRule.test(order1, context)).isFalse();
+                    assertThat(inventoryRule.test(order2, context)).isFalse();
+                    assertThat(inventoryRule.test(order3, context)).isFalse();
+                    assertThat(inventoryRule.test(inventory1, context)).isTrue();
+                }),
+                new NamedRunnable("test order2 rule", () -> {
+                    assertThat(inProgressRule.test(order1, context)).isFalse();
+                    assertThat(inProgressRule.test(order2, context)).isTrue();
+                    assertThat(inProgressRule.test(order3, context)).isFalse();
+                })
+        ), List.of(50, 50), Duration.ofMillis(500));
+
+        helper.test();
     }
 }
