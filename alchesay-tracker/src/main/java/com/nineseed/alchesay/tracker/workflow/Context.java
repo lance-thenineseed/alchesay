@@ -48,7 +48,8 @@ public class Context {
      * @return the value, or a value holding {@link CapturedValue#MISSING_VALUE} if none has that name
      */
     public CapturedValue find(@NonNull String name) {
-        return values.getOrDefault(name, new CapturedValue(name, CapturedValue.MISSING_VALUE));
+        CapturedValue value = values.get(name);
+        return value != null ? value : new CapturedValue(name, CapturedValue.MISSING_VALUE);
     }
 
     /**
